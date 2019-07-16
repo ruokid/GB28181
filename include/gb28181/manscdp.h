@@ -27,10 +27,10 @@
 // PTZ指令
 #define MANSCDP_PTZ_ZOOM_OUT 0x20
 #define MANSCDP_PTZ_ZOOM_IN 0x10
-#define MANSCDP_PTZ_TILT_UP 0x08
-#define MANSCDP_PTZ_TILT_DOWN 0x04
-#define MANSCDP_PTZ_PAN_LEFT 0x02
-#define MANSCDP_PTZ_PAN_RIGHT 0x01
+#define MANSCDP_PTZ_UP 0x08
+#define MANSCDP_PTZ_DOWN 0x04
+#define MANSCDP_PTZ_LEFT 0x02
+#define MANSCDP_PTZ_RIGHT 0x01
 // FI指令
 #define MANSCDP_FI
 // 预置位指令
@@ -182,7 +182,7 @@ int manscdp_device_config_Basic(MANSCDP *manscdp, char *name, int exp, int inter
  *  manscdp_control_PTZ(manscdp, MANSCDP_PTZ_ZOOM_IN, 5, 0, 0);
  *  2.混合操作（左上运动 + 放大）
  *  manscdp_control_PTZ(manscdp,
- *      MANSCDP_PTZ_ZOOM_IN|MANSCDP_PTZ_TILT_UP|MANSCDP_PTZ_PAN_LEFT,
+ *      MANSCDP_PTZ_ZOOM_IN|MANSCDP_PTZ_UP|MANSCDP_PTZ_LEFT,
  *      5, 180, 200);
  */
 int manscdp_device_control_PTZ(MANSCDP *manscdp, int act, int zoom, int tilt, int pan);
