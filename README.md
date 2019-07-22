@@ -1,9 +1,7 @@
 # GB28181
 
 - 本项目是协议层工具，仅生成和解析信令
-- 本项目使用了一个第三方库：mxml
----
-
+- 项目中使用了一个第三方库：mxml
 ---
 
 ### 参考文献
@@ -11,4 +9,4 @@
 
 [2]《28181平台对接接口详解》
 
-[3][《mxml》](https://www.msweet.org/mxml/mxml.html)
+[3] [https://www.msweet.org/mxml/mxml.html](https://www.msweet.org/mxml/mxml.html)
