@@ -6,8 +6,6 @@
 #ifndef _GB28181_MANSCDP_H_
 #define _GB28181_MANSCDP_H_
 
-#include "gb28181/std.h"
-
 #define MANSCDP_MAX_STRING_SIZE 1024
 
 #define MANSCDP_CMDTYPE_ALARM "Alarm"
@@ -57,7 +55,19 @@
 #define manscdp_device_control_IFameCmd(manscdp) \
         manscdp_set_node(manscdp, "IFameCmd", "Send", "Control");
 
-typedef struct _mxml_node_s manscdp_xml_t;
+typedef struct MANSCDP MANSCDP;
+
+/**
+ * 单项回调函数
+ * @param MANSCDP对象
+ * @param 内部xml对象，记录当前处理项
+ * @param 字段值数组
+ * @param 字段个数
+ */
+typedef void (*manscdp_item_cb)(MANSCDP *, void *, const char **, int);
+
+extern manscdp_item_cb manscdp_got_catalog_item;
+extern manscdp_item_cb manscdp_got_file_item;
 
 /**
  * 协议类型
@@ -74,15 +84,18 @@ typedef enum {
  * 监控报警联网系统控制描述协议
  * Monitoringand Alarming Network System Control Description Protocol
  */
-typedef struct {
+struct MANSCDP {
     manscdp_type_e type;
+    struct {
+        char *username;
+        char *host;
+        char *port;
+    } via;
     int sn;
-    manscdp_xml_t *internal;
-    unsigned char cmd[8];
-} MANSCDP;
-
-extern GB28181_item_cb manscdp_got_catalog_item;
-extern GB28181_item_cb manscdp_got_file_item;
+    char *oxml; //解析时接收到的utf8编码的源字符串
+    struct _mxml_node_s *xml; //内部xml结构体，请不要修改这个指针
+    unsigned char cmd[8]; //指令
+};
 
 #ifdef __cplusplus
 extern "C"
@@ -98,7 +111,7 @@ extern "C"
  * 
  * The resulting should be freed with manscdp_free()
  */
-MANSCDP *manscdp_new(manscdp_type_e type, const char *cmdtype, char *device_id);
+MANSCDP *manscdp_new(manscdp_type_e type, const char *cmdtype, const char *device_id);
 
 /**
  * 解析字符串创建一个MANSCDP
@@ -116,22 +129,57 @@ MANSCDP *manscdp_parse(const char *strxml);
 void manscdp_free(MANSCDP *manscdp);
 
 /**
- * 获取指定节点的文本值
+ * 设置事件（回调）
+ * @param type
+ * @param cmdtype
+ * @param handler
+ * @return 0表示更新，1表示添加
+ * 
+ * 注意，catalog和recodeinfo比较特殊，需要赋值单项回调函数
+ */
+int manscdp_on(manscdp_type_e type, char *cmdtype, int (*handler)(MANSCDP *));
+
+/**
+ * 触发已注册对应的事件
+ * @param manscdp
+ * @return 0 is success
+ */
+int manscdp_fire(MANSCDP *manscdp);
+
+/**
+ * 获取节点指定的属性值
+ * @param manscdp
+ * @param xpath
+ * @param name
+ * @return
+ */
+const char *manscdp_get_node_attr(MANSCDP *manscdp, const char *xpath, const char *name);
+
+/**
+ * 获取节点的文本值
  * @param manscdp
  * @param xpath
  * @return
  */
-const char *manscdp_get_node_text(MANSCDP *manscdp, char *xpath);
+const char *manscdp_get_node_text(MANSCDP *manscdp, const char *xpath);
 
 /**
  * 添加节点到指定位置，如果该位置已存在同名节点则修改值
  * @param manscdp
+ * @param xpath If NULL add to root
  * @param name
  * @param value
- * @param xpath if NULL add to root
  * @return 0 is success
  */
-int manscdp_set_node(MANSCDP *manscdp, char *name, char *value, char *xpath);
+int manscdp_set_node(MANSCDP *manscdp, const char *xpath, char *name, char *value);
+
+/**
+ * 将MANSCDP保存文件
+ * @param manscdp
+ * @param xpath If xpath is NULL, save all
+ * @param fd
+ */
+int manscdp_infile(MANSCDP *manscdp, const char *xpath, FILE *fd);
 
 /**
  * 将MANSCDP转换成字符串
