@@ -6,7 +6,7 @@
 #ifndef _GB28181_MANSCDP_H_
 #define _GB28181_MANSCDP_H_
 
-#define MANSCDP_MAX_STRING_SIZE 1024
+#define MANSCDP_BUFSIZE 2048
 
 #define MANSCDP_CMDTYPE_ALARM "Alarm"
 #define MANSCDP_CMDTYPE_BROADCAST "Broadcast"
@@ -41,19 +41,17 @@
 #define MANSCDP_AUXSWITCH
 
 #define manscdp2str(manscdp) \
-        manscdp2string(manscdp, (char[MANSCDP_MAX_STRING_SIZE]){0}, MANSCDP_MAX_STRING_SIZE)
-#define manscdp2str2(manscdp) \
-        manscdp2string(manscdp, (char[MANSCDP_MAX_STRING_SIZE * 2]){0}, MANSCDP_MAX_STRING_SIZE * 2)
+        manscdp2string(manscdp, (char[MANSCDP_BUFSIZE]){0}, MANSCDP_BUFSIZE)
 #define manscdp_device_control_GuardCmd(manscdp, set) \
-        manscdp_set_node(manscdp, "GuardCmd", set == 0 ? "ResetGuard" : "SetGuard", "Control");
+        manscdp_set_node(manscdp, "Control", "GuardCmd", set == 0 ? "ResetGuard" : "SetGuard");
 #define manscdp_device_control_RecordCmd(manscdp, record) \
-        manscdp_set_node(manscdp, "RecordCmd", record == 0 ? "StopRecord" : "Record", "Control");
+        manscdp_set_node(manscdp, "Control", "RecordCmd", record == 0 ? "StopRecord" : "Record");
 #define manscdp_device_control_TeleBoot(manscdp) \
-        manscdp_set_node(manscdp, "TeleBoot", "Boot", "Control");
+        manscdp_set_node(manscdp, "Control", "TeleBoot", "Boot");
 #define manscdp_device_control_AlarmCmd(manscdp) \
-        manscdp_set_node(manscdp, "AlarmCmd", "ResetAlarm", "Control");
+        manscdp_set_node(manscdp, "Control", "AlarmCmd", "ResetAlarm");
 #define manscdp_device_control_IFameCmd(manscdp) \
-        manscdp_set_node(manscdp, "IFameCmd", "Send", "Control");
+        manscdp_set_node(manscdp, "Control", "IFameCmd", "Send");
 
 typedef struct MANSCDP MANSCDP;
 
@@ -65,9 +63,8 @@ typedef struct MANSCDP MANSCDP;
  * @param 字段个数
  */
 typedef void (*manscdp_item_cb)(MANSCDP *, void *, const char **, int);
-
-extern manscdp_item_cb manscdp_got_catalog_item;
-extern manscdp_item_cb manscdp_got_file_item;
+extern manscdp_item_cb manscdp_got_catalog_item; //目录项回调
+extern manscdp_item_cb manscdp_got_file_item; //录像文件回调
 
 /**
  * 协议类型
@@ -92,7 +89,7 @@ struct MANSCDP {
         char *port;
     } via;
     int sn;
-    char *oxml; //解析时接收到的utf8编码的源字符串
+    char *oxml; //解析时接收到的源字符串(已转utf-8)
     struct _mxml_node_s *xml; //内部xml结构体，请不要修改这个指针
     unsigned char cmd[8]; //指令
 };
@@ -127,24 +124,6 @@ MANSCDP *manscdp_parse(const char *strxml);
  * @param manscdp
  */
 void manscdp_free(MANSCDP *manscdp);
-
-/**
- * 设置事件（回调）
- * @param type
- * @param cmdtype
- * @param handler
- * @return 0表示更新，1表示添加
- * 
- * 注意，catalog和recodeinfo比较特殊，需要赋值单项回调函数
- */
-int manscdp_on(manscdp_type_e type, char *cmdtype, int (*handler)(MANSCDP *));
-
-/**
- * 触发已注册对应的事件
- * @param manscdp
- * @return 0 is success
- */
-int manscdp_fire(MANSCDP *manscdp);
 
 /**
  * 获取节点指定的属性值
@@ -187,7 +166,7 @@ int manscdp_infile(MANSCDP *manscdp, const char *xpath, FILE *fd);
  * @param buf
  * @param bufsize
  * @param newstr 如果使用了此参数，buf和bufsize将被忽略，并且需要手动释放
- * @return the total number of bytes that would
+ * @return length
  * 
  * @example
  *  1.不使用newstr
@@ -204,6 +183,13 @@ static inline char *manscdp2string(MANSCDP *manscdp, char *buf, int bufsize)
     manscdp_to_str(manscdp, buf, bufsize, NULL);
     return buf;
 }
+
+/**
+ * got items回调
+ * @param manscdp
+ * @return 返回单项回调运行次数
+ */
+int manscdp_got_items(MANSCDP *manscdp);
 
 /**
  * 设备配置
