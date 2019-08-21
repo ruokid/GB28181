@@ -1,10 +1,15 @@
 /**
  * GB28181
  * 公共安全视频监控联网系统信息传输、交换、控制技术要求
+ * 
+ * 在生产环境中请以相关的厂家实现为标准，有的厂家甚至在不同的地区还会有一些区别
  */
 
 #ifndef _GB28181_STD_H_
 #define _GB28181_STD_H_
+
+#define GB28181_CTNTYPE_MANSCDP "Application/MANSCDP+xml"
+#define GB28181_CTNTYPE_MANSRTSP "Application/MANSRTSP"
 
 #define GB28181_get_industry_type_from_id(gbid) GB28181_get_code_from_id(gbid, 8, 10)
 #define GB28181_get_device_type_from_id(gbid) GB28181_get_code_from_id(gbid, 10, 13)
@@ -20,7 +25,7 @@ typedef enum {
     GB28181_INDUSTRY_SS_INTERNAL      = 2, //社会治安内部接入
     GB28181_INDUSTRY_SS_OTHER         = 3, //社会治安其他接入
     GB28181_INDUSTRY_TRAFFIC_ROAD     = 4, //交通路面接入
-    GB28181_INDUSTRY_TRAFFIC_KAKOU    = 5, //交通卡口接入
+    GB28181_INDUSTRY_TRAFFIC_GATE     = 5, //交通卡口接入
     GB28181_INDUSTRY_TRAFFIC_INTERNAL = 6, //交通内部接入
     GB28181_INDUSTRY_TRAFFIC_OTHER    = 7, //交通其他接入
     GB28181_INDUSTRY_CITY_MANAGEMENT  = 8, //城市管理接入
@@ -158,14 +163,39 @@ typedef enum {
 } GB28181_net_type_e;
 
 /**
- * 回调函数1
- * @param xml string
- * @param 字段个数
- * @param 字段值
+ * 设备目录项
  */
-typedef void (*GB28181_item_cb)(const char *, int, const char **);
+typedef struct {
+    char *DeviceID;             //*设备/区域编码
+    char *Name;                 //*设备/区域名称
+    char *Address;              //地址
+    char *StartTime;            //开始时间
+    char *EndTime;              //截止时间
+    int Secrecy;                //*保密属性，缺省为0; 0不涉密，1涉密
+} GB28181_catalog_item_t;
 
+/**
+ * 文件目录项
+ */
+typedef struct {
+    char *DeviceID;             //*设备/区域编码
+    char *Name;                 //*设备/区域名称
+    char *Address;              //录像地址
+    char *StartTime;            //录像开始时间
+    char *EndTime;              //录像截止时间
+    int Secrecy;                //*保密属性，缺省为0; 0不涉密，1涉密
+    char *Type;                 //录像产生类型。time、alarm或manual
+    char *RecorderID;           //录像触发者ID
+    char *FileSize;             //录像文件大小，单位：Byte
+} GB28181_file_item_t;
+
+/**
+ * 目录项字段
+ */
 extern const char *GB28181_catalog_item_fields[];
+/**
+ * 文件项字段
+ */
 extern const char *GB28181_file_item_fields[];
 
 #ifdef __cplusplus
