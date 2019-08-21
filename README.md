@@ -3,11 +3,17 @@
 - 本项目是协议层工具，仅生成和解析信令
 - 项目中使用了一个第三方库：mxml
 ---
-
-当Catalog回调传入NULL时会使用默认的回调函数`manscdp_got_catalog_items`
-
-同时如果`manscdp_got_catalog_item`被赋值，那么它将会根据Item个数被多次调用
-
+```
+gcc -std=c99 \
+-o libgb28181.so \
+-I ${workspaceFolder}/include \
+-I ${workspaceFolder}/third/mxml-3.0/include \
+-liconv \
+${workspaceFolder}/third/mxml-3.0/lib/libmxml.a \
+${workspaceFolder}/src/gb28181.c \
+${workspaceFolder}/src/manscdp.c \
+${workspaceFolder}/src/util.c
+```
 ---
 ### 参考文献
 [1]《GBT 28181-2016 公共安全视频监控联网系统信息传输、交换、控制技术要求》
