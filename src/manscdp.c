@@ -17,6 +17,7 @@
 static int seq_num = 1000000;
 
 manscdp_item_cb manscdp_got_catalog_item = NULL;
+manscdp_item_cb manscdp_got_file_item = NULL;
 
 char *cvt_charset(const char *, const char *, const char *);
 const char *xml_fmt_cb(mxml_node_t *, int);
@@ -33,6 +34,8 @@ manscdp_new(manscdp_type_e type, const char *cmdtype, const char *device_id)
 
     // xml = mxmlNewXML("1.0"); //使用这个函数会带上 encoding="utf-8"
     xml = mxmlNewElement(NULL, "?xml version=\"1.0\"?"); //GB28181推荐视同GB2312编码格式
+    if (xml == NULL) return NULL;
+
     switch (type) {
         case MANSCDP_TYPE_CONTROL:
             root = mxmlNewElement(xml, "Control");
@@ -232,6 +235,58 @@ int manscdp_to_str(MANSCDP *manscdp, char *buf, int bufsize, char **newstr)
     }
 
     return len;
+}
+
+int manscdp_got_items(MANSCDP *manscdp)
+{
+    if (manscdp == NULL || manscdp->xml == NULL) return -1;
+
+    const char *cmdtype, *list_path, *sumnum, **item_fields, **item_values;
+    int i, n, sum, field_count;
+    mxml_node_t *top, *SumNum, *ItemList, *Item;
+
+    top = manscdp->xml;
+    cmdtype = mxmlGetText(mxmlFindPath(top, "*/CmdType"), 0);
+    if (cmdtype == NULL) return -1;
+
+    if (strcmp(cmdtype, "Catalog") == 0) {
+        list_path = "*/DeviceList";
+        item_fields = GB28181_catalog_item_fields;
+    }
+    else if (strcmp(cmdtype, "RecordInfo") == 0) {
+        list_path = "*/RecordList";
+        item_fields = GB28181_file_item_fields;
+    }
+    else item_fields = NULL;
+    
+    if (item_fields == NULL) return -1;
+
+    for (field_count = 0; item_fields[field_count] != NULL; field_count++);
+
+    n = 0;
+    SumNum = mxmlFindPath(top, "*/SumNum");
+    sumnum = mxmlGetText(SumNum, 0);
+    sum = sumnum == NULL ? 0 : atoi(sumnum);
+    ItemList = mxmlFindPath(top, list_path);
+    Item = mxmlFindElement(ItemList, top, "Item", NULL, NULL, MXML_NO_DESCEND);
+    while (Item != NULL) {
+        if (mxmlGetType(Item) == MXML_ELEMENT && strcmp("Item", mxmlGetElement(Item)) == 0) {
+            if (manscdp_got_catalog_item != NULL) {
+                item_values = malloc(field_count * sizeof(item_fields[0]));
+                if (item_values != NULL) {
+                    for (i = 0; i < field_count; i++) {
+                        item_values[i] = mxmlGetText(mxmlFindPath(Item, item_fields[i]), 0);
+                    }
+                    manscdp_got_catalog_item(manscdp, Item, item_values, field_count);
+                    free(item_values);
+                }
+            }
+            n++;
+        }
+        Item = mxmlWalkNext(Item, top, MXML_NO_DESCEND);
+    }
+
+    return n;
 }
 
 int manscdp_device_config_Basic(MANSCDP *manscdp, char *name, int exp, int interval, int count)
