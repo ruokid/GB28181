@@ -9,6 +9,57 @@
 #include "gb28181/manscdp.h"
 #include "gb28181/sdp.h"
 
+const char *GB28181_catalog_item_fields[] = {
+    /* 0*/"DeviceID",
+    /* 1*/"Name",
+    /* 2*/"Manufacturer",
+    /* 3*/"Model",
+    /* 4*/"Owner",
+    /* 5*/"CivilCode",
+    /* 6*/"Block",
+    /* 7*/"Address",
+    /* 8*/"Parental",
+    /* 9*/"ParentID",
+    /*10*/"SafetyWay",
+    /*11*/"RegisterWay",
+    /*12*/"CertNum",
+    /*13*/"Certifiable",
+    /*14*/"ErrCode",
+    /*15*/"EndTime",
+    /*16*/"Secrecy",
+    /*17*/"IPAddress",
+    /*18*/"Port",
+    /*19*/"Password",
+    /*20*/"Status",
+    /*21*/"Longitude",
+    /*22*/"Latitude",
+    /*23*/"PTZType",
+    /*24*/"PositionType",
+    /*25*/"RoomType",
+    /*26*/"UseType",
+    /*27*/"SupplyLightType",
+    /*28*/"DirectionType",
+    /*29*/"Resolution",
+    /*30*/"BusinessGroupID",
+    /*31*/"DownloadSpeed",
+    /*32*/"SVCSpaceSupportMode",
+    /*33*/"SVCTimeSupportMode",
+    NULL
+};
+const char *GB28181_file_item_fields[] = {
+    "DeviceID",
+    "Name",
+    "FilePath",
+    "Address",
+    "StartTime",
+    "EndTime",
+    "Secrecy",
+    "Type",
+    "RecorderID",
+    "FileSize",
+    NULL
+};
+
 int GB28181_get_code_from_id(const char *gbid, int start, int end)
 {
 	int itype = 0,
