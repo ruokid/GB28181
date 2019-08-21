@@ -96,7 +96,7 @@ manscdp_parse(const char *strxml)
     manscdp_type_e mt;
     mxml_node_t *top, *root;
 
-    top = mxmlLoadString(NULL, ustrxml, MXML_TEXT_CALLBACK);
+    top = mxmlLoadString(NULL, ustrxml, MXML_OPAQUE_CALLBACK);
     root = mxmlGetFirstChild(top);
     while (root != NULL && mxmlGetType(root) != MXML_ELEMENT) {
         root = mxmlWalkNext(root, top, MXML_NO_DESCEND);
@@ -127,7 +127,7 @@ manscdp_parse(const char *strxml)
         goto failure_of_parsing;
     }
 
-    strsn = mxmlGetText(mxmlFindPath(root, "SN"), 0);
+    strsn = mxmlGetOpaque(mxmlFindPath(root, "SN"));
 
     manscdp = (MANSCDP *)malloc(sizeof(MANSCDP));
     if (manscdp == NULL) {
@@ -174,8 +174,7 @@ const char *
 manscdp_get_node_text(MANSCDP *manscdp, const char *xpath)
 {
     if (manscdp == NULL || manscdp->xml == NULL || xpath == NULL) return NULL;
-
-    return mxmlGetText(mxmlFindPath(manscdp->xml, xpath), 0);
+    return mxmlGetOpaque(mxmlFindPath(manscdp->xml, xpath));
 }
 
 int manscdp_set_node(MANSCDP *manscdp, const char *xpath, char *name, char *value)
@@ -246,7 +245,7 @@ int manscdp_got_items(MANSCDP *manscdp)
     mxml_node_t *top, *SumNum, *ItemList, *Item;
 
     top = manscdp->xml;
-    cmdtype = mxmlGetText(mxmlFindPath(top, "*/CmdType"), 0);
+    cmdtype = mxmlGetOpaque(mxmlFindPath(top, "*/CmdType"));
     if (cmdtype == NULL) return -1;
 
     if (strcmp(cmdtype, "Catalog") == 0) {
@@ -265,7 +264,7 @@ int manscdp_got_items(MANSCDP *manscdp)
 
     n = 0;
     SumNum = mxmlFindPath(top, "*/SumNum");
-    sumnum = mxmlGetText(SumNum, 0);
+    sumnum = mxmlGetOpaque(SumNum);
     sum = sumnum == NULL ? 0 : atoi(sumnum);
     ItemList = mxmlFindPath(top, list_path);
     Item = mxmlFindElement(ItemList, top, "Item", NULL, NULL, MXML_NO_DESCEND);
@@ -275,7 +274,7 @@ int manscdp_got_items(MANSCDP *manscdp)
                 item_values = malloc(field_count * sizeof(item_fields[0]));
                 if (item_values != NULL) {
                     for (i = 0; i < field_count; i++) {
-                        item_values[i] = mxmlGetText(mxmlFindPath(Item, item_fields[i]), 0);
+                        item_values[i] = mxmlGetOpaque(mxmlFindPath(Item, item_fields[i]));
                     }
                     manscdp_got_catalog_item(manscdp, Item, item_values, field_count);
                     free(item_values);
