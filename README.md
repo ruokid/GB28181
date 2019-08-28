@@ -34,8 +34,9 @@ body = manscdp2str(manscdp);
 
 manscdp_set_node(manscdp, "Query", "StartTime", "2019-08-28T00:00:00");
 
-body = manscdp2str(manscdp);
-/* <?xml version="1.0"?>
+int slen = manscdp_to_str(manscdp, NULL, 0, &body);
+/* body=>
+ * <?xml version="1.0"?>
  * <Query>
  *     <CmdType>Catalog</CmdType>
  *     <SN>1000001</SN>
@@ -43,6 +44,7 @@ body = manscdp2str(manscdp);
  *     <StartTime>2019-08-28T00:00:00</StartTime>
  * </Query>
  */
+ free(body);
 
 manscdp_get_node_text(manscdp, "Query/CmdType"); //=> Catalog
 
