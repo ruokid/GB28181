@@ -1,0 +1,13 @@
+LIBRARY "libgb28181.dll"
+
+EXPORTS
+	manscdp_new
+	manscdp_parse
+	manscdp_free
+	manscdp_get_node_attr
+	manscdp_get_node_text
+	manscdp_set_node
+	manscdp_infile
+	manscdp_got_items
+	manscdp_device_config_Basic
+	manscdp_device_control_PTZ
