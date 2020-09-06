@@ -1,7 +1,16 @@
-/**
- * 安全防范监控数字视音频编码
- * SVAC: Surveillance Video and Audio Coding
+/* 安全防范监控数字视音频编码
+ * SVAC(Surveillance Video and Audio Coding)
+ * Copyright (C) 2019-2020,
+ *
+ * 参考：
+ *  《安全防范监控数字视音频编解码技术标准》
+ * 
+ * 说起来网上搜索的文章不少都说SVAC是和H265对标，甚至在安防这块是更好的标准，
+ * 各种应该大力推广云云，可为什么找不有用的技术资料呢？
  */
+
+#ifndef _GB28181_SVAC_H_
+#define _GB28181_SVAC_H_
 
 typedef struct {
     int flags;
@@ -58,12 +67,8 @@ typedef struct {
     unsigned int  FrameRate;    //
 } SVAC_EXT_DATA;
 
-#ifndef _GB28181_SVAC_H_
-#define _GB28181_SVAC_H_
-
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
 
 #ifdef __cplusplus
