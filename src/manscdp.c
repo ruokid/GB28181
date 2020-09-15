@@ -1,6 +1,6 @@
-/**
- * 监控报警联网系统控制描述协议
- * MANSCDP: Monitoringand Alarming Network System Control Description Protocol
+/* 监控报警联网系统控制描述协议
+ * MANSCDP(Monitoringand Alarming Network System Control Description Protocol)
+ * Copyright (C) 2019-2020,
  */
 
 #include <stdio.h>
@@ -14,26 +14,45 @@
 #define mxml_save_cb xml_fmt_cb
 #endif
 
-static int seq_num = 1000000;
+#define MANSCDP_PTZCMD_FIXED 0xA5   /* 首字节固定值 */
+#define MANSCDP_PTZCMD_VER 0        /* 本标准的版本号是1.0，版本信息为0 */
+/**
+ * 建立第1, 2, 8字节内容
+ * @param cc 指令码(command code)
+ * @param ver 版本信息 MANSCDP_PTZCMD_VER
+ * 
+ * @note
+ *  字节1: MANSCDP_PTZCMD_FIXED
+ *  字节2: 为版本信息和校验信息，校验信息 = (字节1的高4位 + 字节1的低4位 + 字节2的高4位) % 16
+ *  字节8: 校验和
+ */
+#define MANSCDP_PTZCMD_CHECKSUM(cc, ver) {\
+    cc[0] = MANSCDP_PTZCMD_FIXED;\
+    cc[1] = (MANSCDP_PTZCMD_VER << 4) | (((MANSCDP_PTZCMD_FIXED >> 4) + (MANSCDP_PTZCMD_FIXED & 0x0F) + (MANSCDP_PTZCMD_VER >> 4)) % 16);\
+    cc[7] = (cc[0] + cc[1] + cc[2] + cc[3] + cc[4] + cc[5] + cc[6]) % 256;\
+}
+
+#define mxmlFindXPath(manscdp, xpath) (manscdp ?\
+    (xpath ? mxmlFindPath(manscdp->xml, xpath) : manscdp->xml) : NULL)
+
+static int seq_num = 100000;
 
 manscdp_item_cb manscdp_got_catalog_item = NULL;
 manscdp_item_cb manscdp_got_file_item = NULL;
 
 char *cvt_charset(const char *, const char *, const char *);
 const char *xml_fmt_cb(mxml_node_t *, int);
-int manscdp_notify_keepalive(MANSCDP *);
-int manscdp_response_catalog_item(MANSCDP *);
-static void manscdp_build_control_cmd(MANSCDP *);
+mxml_node_t *mxmlGetRoot(mxml_node_t *);
 
-MANSCDP *
-manscdp_new(manscdp_type_e type, const char *cmdtype, const char *device_id)
+MANSCDP *manscdp_new(manscdp_type_e type, const char *cmdtype, const char *device_id)
 {
     int err, sn;
     mxml_node_t *xml, *root, *CmdType, *SN, *DeviceID;
     MANSCDP *manscdp;
 
-    // xml = mxmlNewXML("1.0"); //使用这个函数会带上 encoding="utf-8"
-    xml = mxmlNewElement(NULL, "?xml version=\"1.0\"?"); //GB28181推荐视同GB2312编码格式
+    // xml = mxmlNewXML("1.0"); //使用这个函数会包含 encoding="utf-8" 属性
+    // xml = mxmlNewElement(NULL, "?xml version=\"1.0\"?"); //不使用encoding属性
+    xml = mxmlNewElement(NULL, "?xml version=\"1.0\" encoding=\"gb2312\"?"); //文档中推荐使用GB2312编码格式
     if (xml == NULL) return NULL;
 
     switch (type) {
@@ -54,28 +73,21 @@ manscdp_new(manscdp_type_e type, const char *cmdtype, const char *device_id)
             break;
 
         default:
-            type = MANSCDP_TYPE_UNSUPPORTED;
             mxmlDelete(xml);
-            root = NULL;
-            xml = NULL;
-            break;
+            return NULL;
     }
 
     if (root) {
         sn = ++seq_num;
         CmdType = mxmlNewElement(root, "CmdType");
-        mxmlNewText(CmdType, 0, cmdtype);
         SN = mxmlNewElement(root, "SN");
+        DeviceID = mxmlNewElement(root, "DeviceID");
+        mxmlNewText(CmdType, 0, cmdtype);
         mxmlNewInteger(SN, sn);
-
-        if (device_id) {
-            DeviceID = mxmlNewElement(root, "DeviceID");
-            mxmlNewText(DeviceID, 0, device_id);
-        }
+        mxmlNewText(DeviceID, 0, device_id);
     }
 
-    manscdp = (MANSCDP *)malloc(sizeof(MANSCDP));
-    if (manscdp == NULL) { // Cannot allocate memory
+    if ((manscdp = malloc(sizeof(MANSCDP))) == NULL) { // Cannot allocate memory
         mxmlDelete(xml);
         return NULL;
     }
@@ -87,94 +99,96 @@ manscdp_new(manscdp_type_e type, const char *cmdtype, const char *device_id)
     return manscdp;
 }
 
-MANSCDP *
-manscdp_parse(const char *strxml)
+MANSCDP *manscdp_parse(const char *xmlstr)
 {
-    char *ustrxml = cvt_charset(strxml, "gbk", "utf-8");
-    const char *strtype, *strsn;
-    MANSCDP *manscdp;
+    int i;
+    char *uxmlstr, encoding[64] = "gbk";
+    const char *sp;
     manscdp_type_e mt;
-    mxml_node_t *top, *root;
+    mxml_node_t *xml, *root;
+    MANSCDP *manscdp;
 
-    top = mxmlLoadString(NULL, ustrxml, MXML_OPAQUE_CALLBACK);
-    root = mxmlGetFirstChild(top);
-    while (root != NULL && mxmlGetType(root) != MXML_ELEMENT) {
-        root = mxmlWalkNext(root, top, MXML_NO_DESCEND);
+    if (xmlstr == NULL) return NULL;
+
+    sp = strstr(xmlstr, "encoding=\"");
+    if (sp) {
+        strncpy(encoding, sp + 10, 63);
+        for (i = 0; i < 63; i++) {
+            if (encoding[i] == '"') {
+                encoding[i] = '\0';
+                break;
+            }
+        }
     }
+
+    // uxmlstr = cvt_charset(xmlstr, encoding, "utf-8"); //有时候gb2312转码会错误
+    uxmlstr = cvt_charset(xmlstr, "gbk", "utf-8");
+    xml = mxmlLoadString(NULL, uxmlstr, MXML_OPAQUE_CALLBACK);
+    root = mxmlGetRoot(xml);
+
+    if (uxmlstr) free(uxmlstr);
 
     if (root == NULL) {
         // "Load xml string error"
-        fprintf(stderr, "MANSCDP parse error: incorrect xml\n%s\n", strxml);
-        goto failure_of_parsing;
+        fprintf(stderr, "MANSCDP parse error: incorrect xml\n%s\n", xmlstr);
+        mxmlDelete(xml);
+        return NULL;
     }
 
-    strtype = mxmlGetElement(root);
-    if (strcmp(strtype, "Response") == 0) {
+    sp = mxmlGetElement(root);
+    if (strcmp(sp, "Response") == 0) {
         mt = MANSCDP_TYPE_RESPONSE;
     }
-    else if (strcmp(strtype, "Control") == 0) {
+    else if (strcmp(sp, "Control") == 0) {
         mt = MANSCDP_TYPE_CONTROL;
     }
-    else if (strcmp(strtype, "Notify") == 0) {
+    else if (strcmp(sp, "Notify") == 0) {
         mt = MANSCDP_TYPE_NOTIFY;
     }
-    else if (strcmp(strtype, "Query") == 0) {
+    else if (strcmp(sp, "Query") == 0) {
         mt = MANSCDP_TYPE_QUERY;
     }
     else { //unsupported
         fprintf(stderr, "MANSCDP parse error: unsupported type\n");
-        mxmlSaveFile(top, stderr, MXML_NO_CALLBACK);
-        goto failure_of_parsing;
+        mxmlSaveFile(xml, stderr, MXML_NO_CALLBACK);
+        mxmlDelete(xml);
+        return NULL;
     }
 
-    strsn = mxmlGetOpaque(mxmlFindPath(root, "SN"));
+    if ((manscdp = malloc(sizeof(MANSCDP)))) {
+        memset(manscdp, 0, sizeof(MANSCDP));
+        manscdp->type = mt;
+        manscdp->cmdtype = mxmlGetOpaque(mxmlFindPath(root, "CmdType"));
+        manscdp->device_id = mxmlGetOpaque(mxmlFindPath(root, "DeviceID"));
+        manscdp->xml = xml;
 
-    manscdp = (MANSCDP *)malloc(sizeof(MANSCDP));
-    if (manscdp == NULL) {
-        fprintf(stderr, "MANSCDP parse error: cannot allocate memory\n");
-        goto failure_of_parsing;
+        sp = mxmlGetOpaque(mxmlFindPath(root, "SN"));
+        manscdp->sn = sp == NULL ? -1 : atoi(sp);
     }
-    memset(manscdp, 0, sizeof(MANSCDP));
-    manscdp->type = mt;
-    manscdp->oxml = ustrxml;
-    manscdp->xml = top;
-    manscdp->sn = strsn == NULL ? 0 : atoi(strsn);
 
     return manscdp;
-
-failure_of_parsing:
-    if (ustrxml != NULL) free(ustrxml);
-    mxmlDelete(top);
-    return NULL;
 }
 
 void manscdp_free(MANSCDP *manscdp)
 {
     if (manscdp == NULL) return;
 
-    if (manscdp->oxml != NULL) free(manscdp->oxml);
-
-    if (manscdp->xml != NULL) mxmlDelete(manscdp->xml);
+    mxmlDelete(manscdp->xml);
+    manscdp->xml = NULL;
 
     free(manscdp);
 }
 
-const char *
-manscdp_get_node_attr(MANSCDP *manscdp, const char *xpath, const char *name)
+const char *manscdp_get_node_attr(MANSCDP *manscdp, const char *xpath, const char *name)
 {
-    if (manscdp == NULL || manscdp->xml == NULL) return NULL;
-
-    mxml_node_t *node = xpath == NULL ?
-        manscdp->xml : mxmlFindPath(manscdp->xml, xpath);
+    mxml_node_t *node = mxmlFindXPath(manscdp, xpath);
 
     return mxmlElementGetAttr(node, name);
 }
 
-const char *
-manscdp_get_node_text(MANSCDP *manscdp, const char *xpath)
+const char *manscdp_get_node_text(MANSCDP *manscdp, const char *xpath)
 {
-    if (manscdp == NULL || manscdp->xml == NULL || xpath == NULL) return NULL;
-    return mxmlGetOpaque(mxmlFindPath(manscdp->xml, xpath));
+    return mxmlGetOpaque(mxmlFindXPath(manscdp, xpath));
 }
 
 int manscdp_set_node(MANSCDP *manscdp, const char *xpath, char *name, char *value)
@@ -184,38 +198,32 @@ int manscdp_set_node(MANSCDP *manscdp, const char *xpath, char *name, char *valu
     int err = -1;
     mxml_node_t *top, *root, *node;
     top = manscdp->xml;
-    if (xpath) {
+    if (xpath != NULL) {
         root = mxmlFindPath(top, xpath);
     }
     else {
-        root = mxmlGetFirstChild(top); //去掉xml头
-        while (root != NULL && mxmlGetType(root) != MXML_ELEMENT) { //确认root存在并且是一个元素
-            root = mxmlWalkNext(root, top, MXML_NO_DESCEND);
-        }
+        root = mxmlGetRoot(top);
     }
 
-    if (root) {
+    if (root != NULL) {
         node = mxmlFindPath(root, name);
         if (node) {
-            mxmlSetText(node, 0, value);
+            err = mxmlSetText(node, 0, value);
         }
         else {
-            node = mxmlNewElement(root, name);
-            mxmlNewText(node, 0, value);
+            if ((node = mxmlNewElement(root, name)) != NULL) {
+                err = mxmlNewText(node, 0, value) == NULL;
+            }
         }
-
-        err = 0;
     }
 
     return err;
 }
 
-int manscdp_infile(MANSCDP *manscdp, const char *xpath, FILE *fd)
+int manscdp_infile(MANSCDP *manscdp, const char *xpath, void *fd)
 {
-    if (manscdp == NULL || manscdp->xml == NULL) return -1;
-
-    mxml_node_t *node = xpath == NULL ?
-        manscdp->xml : mxmlFindPath(manscdp->xml, xpath);
+    mxml_node_t *node = mxmlFindXPath(manscdp, xpath);
+    if (node == NULL) return -1;
 
     return mxmlSaveFile(node, fd, mxml_save_cb);
 }
@@ -225,6 +233,11 @@ int manscdp_to_str(MANSCDP *manscdp, char *buf, int bufsize, char **newstr)
     if (manscdp == NULL || manscdp->xml == NULL) return -1;
 
     int len = 0;
+
+    if (manscdp->device_id) {
+        manscdp_set_node(manscdp, NULL, "DeviceID", (char *)manscdp->device_id);
+    }
+
     if (newstr != NULL) {
         *newstr = mxmlSaveAllocString(manscdp->xml, mxml_save_cb);
         len = strlen(*newstr);
@@ -256,8 +269,11 @@ int manscdp_got_items(MANSCDP *manscdp)
         list_path = "*/RecordList";
         item_fields = GB28181_file_item_fields;
     }
-    else item_fields = NULL;
-    
+    else {
+        list_path = NULL;
+        item_fields = NULL;
+    }
+
     if (item_fields == NULL) return -1;
 
     for (field_count = 0; item_fields[field_count] != NULL; field_count++);
@@ -283,6 +299,50 @@ int manscdp_got_items(MANSCDP *manscdp)
             n++;
         }
         Item = mxmlWalkNext(Item, top, MXML_NO_DESCEND);
+    }
+
+    return n;
+}
+
+int manscdp_get_items(MANSCDP *manscdp, manscdp_item_cb2 cb)
+{
+    const char *sp, **item_fields, *item_values[34];
+    int i, n, sum, field_count;
+    mxml_node_t *root, *SumNum, *ItemList, *Item;
+
+    if (manscdp == NULL || manscdp->xml == NULL) return -1;
+
+    root = mxmlGetRoot(manscdp->xml);
+    if (strcmp(manscdp->cmdtype, "Catalog") == 0) {
+        ItemList = mxmlFindPath(root, "DeviceList");
+        item_fields = GB28181_catalog_item_fields;
+    }
+    else if (strcmp(manscdp->cmdtype, "RecordInfo") == 0) {
+        ItemList = mxmlFindPath(root, "RecordList");
+        item_fields = GB28181_file_item_fields;
+    }
+    else {
+        ItemList = NULL;
+        return -1;
+    }
+
+    if (cb == NULL) return 0;
+    
+    sp = mxmlElementGetAttr(mxmlGetParent(ItemList), "Num");
+    sp = mxmlGetOpaque(mxmlFindPath(root, "SumNum"));
+    sum = sp == NULL ? 0 : atoi(sp);
+    n = 0;
+
+    Item = mxmlFindElement(ItemList, manscdp->xml, "Item", NULL, NULL, MXML_NO_DESCEND);
+    while (Item != NULL) {
+        if (mxmlGetType(Item) == MXML_ELEMENT && strcmp("Item", mxmlGetElement(Item)) == 0) {
+            for (i = 0; item_fields[i]; i++) {
+                item_values[i] = mxmlGetOpaque(mxmlFindPath(Item, item_fields[i]));
+            }
+            cb(manscdp, item_fields, item_values, i);
+            n++;
+        }
+        Item = mxmlWalkNext(Item, manscdp->xml, MXML_NO_DESCEND);
     }
 
     return n;
@@ -316,46 +376,65 @@ int manscdp_device_config_Basic(MANSCDP *manscdp, char *name, int exp, int inter
     return 0;
 }
 
-int manscdp_device_control_PTZ(MANSCDP *manscdp, int act, int zoom, int tilt, int pan)
+int manscdp_Control_DeviceControl(MANSCDP *manscdp, int type, int byte4, int byte5, int byte6, int byte7, int addr)
 {
     if (manscdp == NULL || manscdp->xml == NULL) return -1;
 
-    unsigned char *cc = manscdp->cmd;
+    int act = 0, B4 = byte5, B5 = byte6, B6 = byte7;
+    char cmd[17] = { 0 };
+    unsigned char cc[8] = { 0 };
 
-    if ((act & 0xc0) > 0
-        || (act & 0x30) == 0x30   //缩放
-        || (act & 0x12) == 0x12   //上下
-        || (act & 0x03) == 0x03)  //左右
-    {
-        // assert 错误动作参数
-        return -2;
+    switch (type) {
+        case MANSCDP_PTZCMD_PTZ:
+            if (B4 > 0) {
+                act |= MANSCDP_PTZ_RIGHT;
+            }
+            else if (B4 < 0) {
+                act |= MANSCDP_PTZ_LEFT;
+                B4 = -B4;
+            }
+
+            if (B5 > 0) {
+                act |= MANSCDP_PTZ_UP;
+            }
+            else if (B5 < 0) {
+                act |= MANSCDP_PTZ_DOWN;
+                B5 = -B5;
+            }
+
+            if (B6 > 0) {
+                act |= MANSCDP_PTZ_ZOOM_IN;
+            }
+            else if (B6 < 0) {
+                act |= MANSCDP_PTZ_ZOOM_OUT;
+                B6 = -B6;
+            }
+            break;
+
+        default:
+            return -2;
     }
 
+    // 字节1：固定值
+    cc[0] = MANSCDP_PTZCMD_FIXED;
+    // 字节2：高4位是版本信息，低4位是校验位；校验位 = (字节1的高4位 + 字节1的低4位 + 字节2的高4位) % 16
+    cc[1] = (MANSCDP_PTZCMD_VER << 4) |
+        (((MANSCDP_PTZCMD_FIXED >> 4) + (MANSCDP_PTZCMD_FIXED & 0x0F) + (MANSCDP_PTZCMD_VER >> 4)) % 16);
+    // 字节3：地址的低8位
+    cc[2] = addr & 0xff;
+    // 字节4：指令码
     cc[3] = act;
-    cc[4] = tilt & 0xff;
-    cc[5] = pan & 0xff;
-    cc[6] = (zoom & 0x0f) << 4;
-
-    char cmd[32] = {0};
-
-    manscdp_build_control_cmd(manscdp);
+    // 字节5：数据1
+    cc[4] = B4 & 0xff;
+    // 字节6：数据2
+    cc[5] = B5 & 0xff;
+    // 字节7：高4位是数据3，低4位是地址的高4位
+    cc[6] = ((B6 & 0x0f) << 4) | ((addr & 0xf0) >> 4);
+    // 字节8：前面的第1~7字节的算术和的低8位，即算术和对256取模后的结果
+    cc[7] = (cc[0] + cc[1] + cc[2] + cc[3] + cc[4] + cc[5] + cc[6]) % 256;
 
     sprintf(cmd, "%02X%02X%02X%02X%02X%02X%02X%02X",
         cc[0], cc[1], cc[2], cc[3], cc[4], cc[5], cc[6], cc[7]);
 
-    return manscdp_set_node(manscdp, "PTZCmd", cmd, "Control");
-}
-
-/**
- * 建立第1, 2, 8字节内容
- * @param manscdp
- */
-static void
-manscdp_build_control_cmd(MANSCDP *manscdp)
-{
-    int fixed = 0xA5, ccver = 0;
-    unsigned char *cc = manscdp->cmd;
-    cc[0] = fixed; //固定内容
-    cc[1] = (ccver << 4) | (((fixed >> 4) + (fixed & 0x0F) + ccver) % 16); //版本信息和校验值
-    cc[7] = (cc[0] + cc[1] + cc[2] + cc[3] + cc[4] + cc[5] + cc[6]) % 256;
+    return manscdp_set_node(manscdp, "Control", "PTZCmd", cmd);
 }
