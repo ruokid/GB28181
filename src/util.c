@@ -1,5 +1,5 @@
-/*
- * 
+/* gb28181/util.c
+ * Copyright (C) 2019-2020,
  */
 
 #include <iconv.h>
@@ -9,11 +9,11 @@
 
 void *mallocz(size_t size)
 {
-	void *p = malloc(size);
+    void *p = malloc(size);
 
-	memset(p, 0, size);
+    memset(p, 0, size);
 
-	return p;
+    return p;
 }
 
 /**
@@ -22,8 +22,7 @@ void *mallocz(size_t size)
  * @param w
  * @return
  */
-const char *
-xml_fmt_cb(mxml_node_t *node, int w)
+const char *xml_fmt_cb(mxml_node_t *node, int w)
 {
     char sp[1024] = {0};
     int deep = 0;
@@ -36,7 +35,7 @@ xml_fmt_cb(mxml_node_t *node, int w)
     switch (w) {
         case MXML_WS_BEFORE_OPEN:
             break;
-        
+
         case MXML_WS_AFTER_OPEN:
             child = mxmlGetFirstChild(node);
             if (child == NULL) {
@@ -74,30 +73,27 @@ xml_fmt_cb(mxml_node_t *node, int w)
  * @param fromcode
  * @param tocode
  * @return str
- * 
+ *
  * The resulting should be freed with free()
  */
-char *
-cvt_charset(const char *src, const char *fromcode, const char *tocode)
+char *cvt_charset(const char *src, const char *fromcode, const char *tocode)
 {
     iconv_t cd;
-	size_t srclen = strlen(src), dstlen = srclen * 2, cvtlen;
+    size_t srclen = strlen(src), dstlen = srclen * 2, cvtlen;
     char *inbuf, *outbuf, *ip, *op;
     inbuf = (char *)mallocz(srclen + 1);
-    if (inbuf == NULL) {
-        return inbuf;
-    }
+    if (inbuf == NULL) return NULL;
     outbuf = (char *)mallocz(dstlen);
     if (outbuf == NULL) {
         free(inbuf);
-        return outbuf;
+        return NULL;
     }
-	cd = iconv_open(tocode, fromcode);
-	if (cd == NULL) {
+    cd = iconv_open(tocode, fromcode);
+    if (cd == NULL) {
         free(inbuf);
         free(outbuf);
-		return NULL;
-	}
+        return NULL;
+    }
     ip = inbuf;
     op = outbuf;
     strcpy(inbuf, src);
@@ -106,4 +102,19 @@ cvt_charset(const char *src, const char *fromcode, const char *tocode)
     free(ip);
 
     return op;
+}
+
+/**
+ * 获取根元素
+ * @param xml
+ * @return NULL is error
+ */
+mxml_node_t *mxmlGetRoot(mxml_node_t *xml)
+{
+    mxml_node_t *root = mxmlGetFirstChild(xml);
+    while (root != NULL && mxmlGetType(root) != MXML_ELEMENT) {
+        root = mxmlWalkNext(root, xml, MXML_NO_DESCEND);
+    }
+
+    return root;
 }
