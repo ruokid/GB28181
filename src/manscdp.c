@@ -411,6 +411,44 @@ int manscdp_Control_DeviceControl(MANSCDP *manscdp, int type, int byte4, int byt
             }
             break;
 
+        case MANSCDP_PTZCMD_FI:
+            if (B4 > 0) {
+                act |= MANSCDP_FI_FOCUS_OUT;
+            }
+            else if (B4 < 0) {
+                act |= MANSCDP_FI_FOCUS_IN;
+                B4 = -B4;
+            }
+
+            if (B5 > 0) {
+                act |= MANSCDP_FI_IRIS_UP;
+            }
+            else if (B5 < 0) {
+                act |= MANSCDP_FI_IRIS_DOWN;
+                B5 = -B5;
+            }
+            break;
+
+        case MANSCDP_PTZCMD_CHECKPOINT:
+            act = byte4 & 0xff;
+            break;
+
+        case MANSCDP_PTZCMD_CRUISE:
+            break;
+
+        case MANSCDP_PTZCMD_SCAN:
+            break;
+
+        case MANSCDP_PTZCMD_AUXSWITCH:
+            if (B5 > 0) {
+                act |= MANSCDP_AUXSWITCH_ON;
+            }
+            else if (B5 < 0) {
+                act |= MANSCDP_AUXSWITCH_OFF;
+                B5 = -B5;
+            }
+            break;
+
         default:
             return -2;
     }
