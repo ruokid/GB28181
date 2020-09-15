@@ -24,39 +24,70 @@
 #define MANSCDP_CMDTYPE_PRESETQUERY     "PresetQuery"
 #define MANSCDP_CMDTYPE_RECORDINFO      "RecordInfo"
 
-// PTZ指令
-#define MANSCDP_PTZ_ZOOM_OUT    0x20
-#define MANSCDP_PTZ_ZOOM_IN     0x10
-#define MANSCDP_PTZ_UP          0x08
-#define MANSCDP_PTZ_DOWN        0x04
-#define MANSCDP_PTZ_LEFT        0x02
-#define MANSCDP_PTZ_RIGHT       0x01
-// FI指令
-#define MANSCDP_FI
-// 预置位指令
-#define MANSCDP_PRESET
-// 巡航指令
-#define MANSCDP_CRUISE
-// 扫描指令
-#define MANSCDP_SCAN
-// 辅助开关控制指令
-#define MANSCDP_AUXSWITCH
+#define MANSCDP_PTZ_ZOOM_OUT    0x20 /* 画面缩小 */
+#define MANSCDP_PTZ_ZOOM_IN     0x10 /* 画面放大 */
+#define MANSCDP_PTZ_UP          0x08 /* 云台向上 */
+#define MANSCDP_PTZ_DOWN        0x04 /* 云台向下 */
+#define MANSCDP_PTZ_LEFT        0x02 /* 云台向左 */
+#define MANSCDP_PTZ_RIGHT       0x01 /* 云台向右 */
 
-#define manscdp2str(manscdp) \
+#define MANSCDP_FI_FOCUS_IN     0x42 /* 聚焦拉近 */
+#define MANSCDP_FI_FOCUS_OUT    0x41 /* 聚焦拉远 */
+#define MANSCDP_FI_IRIS_UP      0x44 /* 光圈放大 */
+#define MANSCDP_FI_IRIS_DOWN    0x48 /* 光圈缩小 */
+
+#define MANSCDP_CHECKPOINT_ADD  0x81 /* 设置预置位 */
+#define MANSCDP_CHECKPOINT_SET  0x82 /* 调用预置位 */
+#define MANSCDP_CHECKPOINT_DEL  0x83 /* 删除预置位 */
+
+#define MANSCDP_CRUISE_ADD      0x84 /* 加入巡航点 */
+#define MANSCDP_CRUISE_DEL      0x85 /* 删除巡航点 */
+#define MANSCDP_CRUISE_SPEED    0x86 /* 设置巡航速度 */
+#define MANSCDP_CRUISE_DURATION 0x87 /* 设置巡航停留时间 */
+#define MANSCDP_CRUISE_START    0x88 /* 开始巡航 */
+
+#define MANSCDP_SCAN_START      0x89 /* 开始自动扫描 */
+#define MANSCDP_SCAN_LEFT       0x89 /* 设置自动扫描左边界 */
+#define MANSCDP_SCAN_RIGHT      0x89 /* 设置自动扫描右边界 */
+#define MANSCDP_SCAN_SPEED      0x8A /* 设置自动扫描速度 */
+
+#define MANSCDP_AUXSWITCH_ON    0x8C /* 打开辅助开关 */
+#define MANSCDP_AUXSWITCH_OFF   0x8D /* 关闭辅助开关 */
+
+#define manscdp2str(manscdp)\
         manscdp2string(manscdp, (char[MANSCDP_BUFSIZE]){0}, MANSCDP_BUFSIZE)
-#define manscdp_device_control_GuardCmd(manscdp, set) \
+/**
+ * 报警布防/撤防
+ * @param manscdp MANSCDP
+ * @param set 0撤防，1布防
+ */
+#define manscdp_Control_GuardCmd(manscdp, set)\
         manscdp_set_node(manscdp, "Control", "GuardCmd", set == 0 ? "ResetGuard" : "SetGuard")
-#define manscdp_device_control_RecordCmd(manscdp, record) \
+/**
+ * 录像控制
+ * @param manscdp MANSCDP
+ * @param record 0停止录像，1开始录像
+ */
+#define manscdp_Control_RecordCmd(manscdp, record)\
         manscdp_set_node(manscdp, "Control", "RecordCmd", record == 0 ? "StopRecord" : "Record")
-#define manscdp_device_control_TeleBoot(manscdp) \
+/**
+ * 远程启动
+ * @param manscdp MANSCDP
+ */
+#define manscdp_Control_TeleBoot(manscdp)\
         manscdp_set_node(manscdp, "Control", "TeleBoot", "Boot")
-#define manscdp_device_control_AlarmCmd(manscdp) \
+/**
+ * 报警复位
+ * @param manscdp MANSCDP
+ */
+#define manscdp_Control_AlarmCmd(manscdp)\
         manscdp_set_node(manscdp, "Control", "AlarmCmd", "ResetAlarm")
-#define manscdp_device_control_IFameCmd(manscdp) \
+/**
+ * 强制关键帧
+ * @param manscdp MANSCDP
+ */
+#define manscdp_Control_IFameCmd(manscdp)\
         manscdp_set_node(manscdp, "Control", "IFameCmd", "Send")
-
-#define manscdp_notify_keepalive(id) \
-        manscdp_new(MANSCDP_TYPE_NOTIFY, MANSCDP_CMDTYPE_KEEPALIVE, id)
 
 typedef struct MANSCDP MANSCDP;
 
@@ -68,6 +99,12 @@ typedef struct MANSCDP MANSCDP;
  * @param 字段个数
  */
 typedef void (*manscdp_item_cb)(MANSCDP *, void *, const char **, int);
+/**
+ * 单项回调函数2
+ * @param MANSCDP
+ * @param 字段数组
+ * @param 值数组
+ */
 typedef void (*manscdp_item_cb2)(MANSCDP *, const char **, const char **, int);
 extern manscdp_item_cb manscdp_got_catalog_item; //目录项回调
 extern manscdp_item_cb manscdp_got_file_item; //录像文件回调
@@ -85,12 +122,25 @@ typedef enum {
 // const char *manscdp_type_es[] = { "Response", "Control", "Notify", "Query" };
 
 /**
+ * PTZCmd类型
+ */
+enum {
+    MANSCDP_PTZCMD_PTZ = 1,     //PTZ
+    MANSCDP_PTZCMD_FI,          //聚焦、光圈
+    MANSCDP_PTZCMD_CHECKPOINT,  //预置位
+    MANSCDP_PTZCMD_CRUISE,      //巡航
+    MANSCDP_PTZCMD_SCAN,        //扫描
+    MANSCDP_PTZCMD_AUXSWITCH    //辅助开关
+};
+
+/**
  * 监控报警联网系统控制描述协议
  * Monitoringand Alarming Network System Control Description Protocol
  */
 struct MANSCDP {
     manscdp_type_e type;    /* 协议类型 */
-    const char *cmdtype;
+    const char *cmdtype;    /* CmdType */
+    const char *device_id;  /* 国标编码 */
     struct {
         char *username;
         char *host;
@@ -171,7 +221,7 @@ int manscdp_set_node(MANSCDP *manscdp, const char *xpath, char *name, char *valu
  * @param fd 文件句柄
  * @return 0 is success
  */
-int manscdp_infile(MANSCDP *manscdp, const char *xpath, FILE *fd);
+int manscdp_infile(MANSCDP *manscdp, const char *xpath, void *fd);
 
 /**
  * 将MANSCDP转换成字符串
@@ -193,7 +243,7 @@ int manscdp_infile(MANSCDP *manscdp, const char *xpath, FILE *fd);
 int manscdp_to_str(MANSCDP *manscdp, char *buf, int bufsize, char **newstr);
 static inline char *manscdp2string(MANSCDP *manscdp, char *buf, int bufsize)
 {
-    manscdp_to_str(manscdp, buf, bufsize, NULL);
+    manscdp_to_str(manscdp, buf, bufsize, 0);
     return buf;
 }
 
@@ -201,6 +251,8 @@ static inline char *manscdp2string(MANSCDP *manscdp, char *buf, int bufsize)
  * got items回调
  * @param manscdp MANSCDP
  * @return 返回单项回调运行次数
+ * 
+ * @deprecated 请使用manscdp_get_items
  */
 int manscdp_got_items(MANSCDP *manscdp);
 /**
@@ -222,32 +274,20 @@ int manscdp_get_items(MANSCDP *manscdp, manscdp_item_cb2 cb);
 int manscdp_device_config_Basic(MANSCDP *manscdp, char *name, int exp, int interval, int count);
 
 /**
- * 
+ * 前端设备控制
  * @param manscdp MANSCDP
- * @return 0 is success
- */
-int manscdp_Control_DeviceControl(MANSCDP *manscdp);
-
-/**
- * 云台控制
- * @param manscdp MANSCDP
- * @param act 行为，使用 MANSCDP_PTZ_* 相关宏指令
- * @param zoom 缩放值。取值范围：0~15
- * @param tilt 垂直运动值。取值范围：0~255
- * @param pan 水平运动值。取值范围：0~255
+ * @param type 指令类型：PTZ/FI/预置位/巡航/扫描/辅助开关控制
+ * @param byte4 指令码
+ * @param byte5 数据1，第5字节
+ * @param byte6 数据2，第6字节
+ * @param byte7 数据3，第7字节高4位
+ * @param addr 地址
  * @return 0 is success
  * 
- * @example
- *  1.单项操作（放大）
- *  manscdp_control_PTZ(manscdp, MANSCDP_PTZ_ZOOM_IN, 5, 0, 0);
- *  2.混合操作（左上运动 + 放大）
- *  manscdp_control_PTZ(manscdp,
- *      MANSCDP_PTZ_ZOOM_IN|MANSCDP_PTZ_UP|MANSCDP_PTZ_LEFT,
- *      5, 180, 200);
- * 
- * @deprecated 请使用 manscdp_control_PTZ(use manscdp_control_PTZ functions instead)
+ * @note
+ *  byte5, byte6, byte7这三个虽然是字节数据内容但是作为参数是有符号的，用来判断方向
  */
-int manscdp_device_control_PTZ(MANSCDP *manscdp, int act, int zoom, int tilt, int pan);
+int manscdp_Control_DeviceControl(MANSCDP *manscdp, int type, int byte4, int byte5, int byte6, int byte7, int addr);
 /**
  * 云台控制
  * @param manscdp MANSCDP
@@ -258,27 +298,59 @@ int manscdp_device_control_PTZ(MANSCDP *manscdp, int act, int zoom, int tilt, in
  * 
  * @example
  *  1.放大（单项操作）
- *  manscdp_control_PTZ(manscdp, 0, 0, 5);
+ *  manscdp_Control_PTZ(manscdp, 0, 0, 5);
  *  2.左上运动 + 放大（混合操作）
- *  manscdp_control_PTZ(manscdp, -90, 180, 10);
+ *  manscdp_Control_PTZ(manscdp, -90, 180, 10);
  */
-int manscdp_control_PTZ(MANSCDP *manscdp, int pan, int tilt, int zoom);
-
+#define manscdp_Control_PTZ(manscdp, pan, tilt, zoom)\
+        manscdp_Control_DeviceControl(manscdp, MANSCDP_PTZCMD_PTZ, 0, pan, tilt, zoom, 0)
 /**
  * 控制聚焦与光圈
  * @param manscdp MANSCDP
- * @param foucus 聚焦速度 （-255~255）
- * @param iris 光圈速度   （-255~255）
+ * @param foucus 聚焦速度 （拉近 -255~255 拉远）
+ * @param iris 光圈速度   （缩小 -255~255 放大）
  * @return 0 is success
+ * 
+ * @example
+ *  1.拉近
+ *  manscdp_Control_FI(manscdp, 128, 0);
+ *  2.拉远 + 光圈缩小
+ *  manscdp_Control_FI(manscdp, -128, -64);
  */
-int manscdp_control_FI(MANSCDP *manscdp, int focus, int iris);
-
+#define manscdp_Control_FI(manscdp, focus, iris)\
+        manscdp_Control_DeviceControl(manscdp, MANSCDP_PTZCMD_FI, 0, focus, iris, 0, 0)
 /**
  * 预置位操作
  * @param manscdp MANSCDP
+ * @param act 使用MANSCDP_CHECKPOINT_*宏指令
+ * @param index 1~255
  * @return 0 is success
+ * 
+ * @example
+ *  1.设置一个预置位
+ *  manscdp_Control_CheckPoint(manscdp, MANSCDP_CHECKPOINT_ADD, 1);
+ *  2.调用预置位
+ *  manscdp_Control_CheckPoint(manscdp, MANSCDP_CHECKPOINT_SET, 1);
+ *  3.删除预置位
+ *  manscdp_Control_CheckPoint(manscdp, MANSCDP_CHECKPOINT_DEL, 1);
  */
-int manscdp_control_CheckPoint(MANSCDP *manscdp);
+#define manscdp_Control_CheckPoint(manscdp, act, index)\
+        manscdp_Control_DeviceControl(manscdp, MANSCDP_PTZCMD_CHECKPOINT, act, 0, index, 0, 0)
+
+/**
+ * 辅助开关控制
+ * @param manscdp MANSCDP
+ * @param no 辅助开关编号，取值为1表示雨刷控制（关闭 -255~255 打开）
+ * @return 0 is success
+ * 
+ * @example
+ *  1.打开雨刷
+ *  manscdp_Control_AUXSwtich(manscdp, 1);
+ *  2.关闭雨刷
+ *  manscdp_Control_AUXSwtich(manscdp, -1);
+ */
+#define manscdp_Control_AUXSwtich(manscdp, no)\
+        manscdp_Control_DeviceControl(manscdp, MANSCDP_PTZCMD_AUXSWITCH, 0, no, 0, 0, 0)
 
 #ifdef __cplusplus
 }//extern "C"
