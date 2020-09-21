@@ -3,18 +3,8 @@
 - 本项目是协议层工具，仅生成和解析信令
 - 项目中使用了一个第三方库：mxml
 ---
-```
-gcc -std=c99 \
--o libgb28181.so \
--I ${workspaceFolder}/include \
--I ${workspaceFolder}/third/mxml-3.0/include \
--liconv \
-${workspaceFolder}/third/mxml-3.0/lib/libmxml.a \
-${workspaceFolder}/src/gb28181.c \
-${workspaceFolder}/src/manscdp.c \
-${workspaceFolder}/src/util.c
-```
-使用示例
+
+### 使用示例
 ```
 #include "gb28181/std.h"
 #include "gb28181/manscdp.h"
@@ -47,6 +37,16 @@ int slen = manscdp_to_str(manscdp, NULL, 0, &body);
  free(body);
 
 manscdp_get_node_text(manscdp, "Query/CmdType"); //=> Catalog
+
+manscdp_Control_PTZ(manscdp, -90, 180, 10);
+/* <?xml version="1.0" encoding="GB2312"?>
+ * <Control>
+ *   <CmdType>DeviceControl</CmdType>
+ *   <DeviceID>设备/网关ID</DeviceID>
+ *   <PTZCmd>A50F001A5AB4A07C</PTZCmd>
+ *   <SN>100001</SN>
+ * </Control>
+ */
 
 ```
 
